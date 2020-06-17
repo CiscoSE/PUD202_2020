@@ -1,0 +1,143 @@
+#Copyright (c) 2020 Cisco and/or its affiliates.
+#
+#This software is licensed to you under the terms of the Cisco Sample
+#Code License, Version 1.1 (the "License"). You may obtain a copy of the
+#License at
+#
+#               https://developer.cisco.com/docs/licenses
+#
+#All use of the material herein must be in accordance with the terms of
+#the License. All rights not expressly granted by the License are
+#reserved. Unless required by applicable law or agreed to separately in
+#writing, software distributed under the License is distributed on an "AS
+#IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+#or implied.
+
+
+## This Playbook configures the TestVM into the Migrated Network
+
+# "{{ vm_name }}"
+# "{{ dest_host_name }}"
+# "{{ dest_dstore_name }}"
+# "{{ source_dc }}"
+# "{{ dest_dc }}"
+# "{{ dest_network_name }}"
+
+- name: uc03_move_aci_vms
+  hosts: all
+  connection: local
+  gather_facts: no
+########
+
+  tasks:
+
+#### fping subnet
+      - name: Pre Test Subnet Connectivity
+        shell:
+          cmd: "fping -ga {{ gateway }}/26"
+        delegate_to: localhost
+        register: preresult
+        ignore_errors: yes
+
+      - set_fact:
+           prelist: "{{ preresult.stdout_lines | sort }}"
+
+##### Define ap_name out of vlan_id
+      - set_fact: 
+              ap_name: "Vlan{{ vlan_id }}"
+
+##### Change Network of VM
+      - name: Change the network
+        vmware_guest:
+          hostname: "{{ inventory_hostname }}"
+          username: "{{ lookup('env', 'ANSIBLE_NET_USERNAME') }}"
+          password: "{{ lookup('env', 'ANSIBLE_NET_PASSWORD') }}"
+          validate_certs: False
+          name: "uc03-testvm"
+          datacenter: "{{ dest_dc }}"
+          networks: 
+           - name: "{{ tenant_name }}|{{ ap_name }}|{{ ap_name }}_EPG"
+        retries: 30 
+        delay: 5
+      
+##### Power on the Test VM
+      - name: Power On Test VM
+        vmware_guest:
+          hostname: "{{ inventory_hostname }}"
+          username: "{{ lookup('env', 'ANSIBLE_NET_USERNAME') }}"
+          password: "{{ lookup('env', 'ANSIBLE_NET_PASSWORD') }}"
+          validate_certs: False
+          name: "uc03-testvm"
+          datacenter: "{{ dest_dc }}"
+          networks: 
+           - name: "{{ tenant_name }}|{{ ap_name }}|{{ ap_name }}_EPG"
+          state: poweredon
+        retries: 30 
+        delay: 5
+
+##### Hardcoded break to allow the VM to boot
+      - pause:
+          seconds: 30
+
+          
+##### fping to verify layer2 connectivity
+      - name: Test Subnet Connectivity
+        shell:
+          cmd: "fping -ga {{ gateway }}/{{ gw_cidr }}"
+        delegate_to: localhost
+        register: postresult
+        ignore_errors: yes
+
+##### sorting etc.    
+      - set_fact:
+           postlist: "{{ postresult.stdout_lines | sort }}"
+
+#### Power Down the Test VM
+      - name: PowerOff VM
+        vmware_guest:
+          hostname: "{{ inventory_hostname }}"
+          username: "{{ lookup('env', 'ANSIBLE_NET_USERNAME') }}"
+          password: "{{ lookup('env', 'ANSIBLE_NET_PASSWORD') }}"
+          validate_certs: False
+          name: "uc03-testvm"
+          datacenter: "{{ dest_dc }}"
+          networks: 
+           - name: "quarantine"
+          state: poweredoff
+        retries: 30 
+        delay: 5
+
+#### Change the network back to quarantine
+      - name: Change the network
+        vmware_guest:
+          hostname: "{{ inventory_hostname }}"
+          username: "{{ lookup('env', 'ANSIBLE_NET_USERNAME') }}"
+          password: "{{ lookup('env', 'ANSIBLE_NET_PASSWORD') }}"
+          validate_certs: False
+          name: "uc03-testvm"
+          datacenter: "{{ dest_dc }}"
+          networks: 
+           - name: "quarantine"
+        retries: 30
+        delay: 5
+
+
+#### set Text for the Webex message in case of failure
+      - set_stats:
+          data:
+            webextext: ".::|::. Layer2 Connectivity could not be verified - Rolling Back all Configuration .::|::."
+          per_host: no
+        when: prelist == postlist
+
+#### set playbook on failed state if prelist and post are equal
+      - set_stats:
+          data:
+            webextext: "Layer2 Connectivity verified"
+          per_host: no
+        failed_when: prelist == postlist
+  
+
+
+
+
+

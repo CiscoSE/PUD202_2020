@@ -1,0 +1,66 @@
+Copyright (c) 2020 Cisco and/or its affiliates.
+
+This software is licensed to you under the terms of the Cisco Sample
+Code License, Version 1.1 (the "License"). You may obtain a copy of the
+License at
+
+               https://developer.cisco.com/docs/licenses
+
+All use of the material herein must be in accordance with the terms of
+the License. All rights not expressly granted by the License are
+reserved. Unless required by applicable law or agreed to separately in
+writing, software distributed under the License is distributed on an "AS
+IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+or implied.
+
+### vars needed
+### vlan_id - integer; 1 - 4096
+
+- name: Play 1 Get Network Information
+  hosts: all
+  gather_facts: no
+  vars:
+    ansible_connection: network_cli
+    ansible_network_os: nxos
+    ansible_user: "{{ lookup('env', 'ANSIBLE_NET_USERNAME') }}"
+    ansible_password: "{{ lookup('env', 'ANSIBLE_NET_PASSWORD') }}"
+#######
+
+  tasks:
+
+#### set interface_name out of vlan_id
+    - set_fact: 
+        interface_name: "Vlan{{ vlan_id }}"
+
+#### do show run int on given interface
+    - name: run show run int 
+      nxos_command: 
+        commands: "show running-config interface {{ interface_name }}"
+      register: qResult
+
+#### set result as fact and join to string
+    - set_fact:
+        x: "{{ qResult.stdout | join }}"
+
+#### debug output
+    - debug:
+        var: x
+
+#### set gateway through regex search     
+    - set_stats:
+        data:
+          gw_cidr: "{{ x | regex_search('\/..')}}"
+          gateway: "{{ x | regex_search('ip \\d{1,3}.\\d{1,3}.\\d{1,3}.\\d{1,3}') | replace('ip ', '')}}"
+        per_host: no
+    
+    - set_fact:
+        gateway1: "{{ x | regex_search('ip \\d{1,3}.\\d{1,3}.\\d{1,3}.\\d{1,3}') | replace('ip ', '')}}"
+
+    - debug:
+        var: gateway1
+      
+
+    - set_stats:
+       data:
+         webextext: ".:|:.:|:. Gateway for VLAN {{ vlan_id }} is {{ gateway1 }} .:|:.:|:."
+       per_host: no
