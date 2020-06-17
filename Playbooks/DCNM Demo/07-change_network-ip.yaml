@@ -1,0 +1,72 @@
+Copyright (c) 2020 Cisco and/or its affiliates.
+
+This software is licensed to you under the terms of the Cisco Sample
+Code License, Version 1.1 (the "License"). You may obtain a copy of the
+License at
+
+               https://developer.cisco.com/docs/licenses
+
+All use of the material herein must be in accordance with the terms of
+the License. All rights not expressly granted by the License are
+reserved. Unless required by applicable law or agreed to separately in
+writing, software distributed under the License is distributed on an "AS
+IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+or implied.
+
+### vars needed
+### dcnmhost - ip adress or dns name; IP/Name of DCNM Host
+### dcnmapitoken - apitoken; Authenticate against dcnm api
+### multisite_fabric_name - string; Name of Multisite Fabric
+### gateway - IPv4 address; Gateway IP eg 10.1.1.1 (variable from NXOS module)
+### gw_cidr - Netmask in CIDR notation; Gateway Netmask eg /24 (variable from NXOS module)
+### vlan_name - string; VLAN name (if > 32 chars enable:system vlan long-name)
+### interface_mtu - integer 68-9216; MTU size
+### enable_l3_on_border - boolean
+### vrf_name - string; Name of existing VRF
+### vlan_id - integer; 1 - 4096
+### segment_id - int; ID needed in order to identify a network in DCNM
+### network_name - string; Name of the network
+###
+### vars provided
+### webextext - text; Message used in Webex Teams Module
+
+- name: Play Change Network-IP
+  hosts: all
+  connection: local
+
+
+  tasks:
+
+    - set_fact:
+        config: "{\"gatewayIpAddress\":\"{{ gateway }}{{ gw_cidr }}\",\"gatewayIpV6Address\":\"\",\"vlanName\":\"{{ vlan_name }}\",\"intfDescription\":\"\",\"mtu\":\"{{ interface_mtu }}\",\"secondaryGW1\":\"\",\"secondaryGW2\":\"\",\"suppressArp\":false,\"rtBothAuto\":false,\"enableL3OnBorder\":{{ enable_l3_on_border }},\"dhcpServerAddr1\":\"\",\"dhcpServerAddr2\":\"\",\"vrfDhcp\":\"\",\"loopbackId\":\"\",\"tag\":\"12345\",\"vrfName\":\"{{ vrf_name }}\",\"isLayer2Only\":false,\"nveId\":1,\"vlanId\":\"{{ vlan_id }}\",\"segmentId\":\"{{ segment_id }}\",\"networkName\":\"{{ network_name }}\"}"
+
+  
+    - name: Create Easy Fabric
+      uri:
+          url: https://{{ dcnmhost }}/rest/top-down/fabrics/{{ multisite_fabric_name }}/networks/{{ network_name }}
+          headers:
+            Dcnm-token: "{{ dcnmapitoken }}"
+            Content-Type: "application/json"
+          method: PUT
+          body_format: json
+          body:
+            {
+                "fabric": "{{ multisite_fabric_name }}",
+                "vrf": "demo",
+                "networkName": "{{ network_name }}",
+                "displayName": "{{ network_name }}",
+                "networkId": "{{ segment_id }}",
+                "networkTemplateConfig": "{{config | string}}",
+                "networkTemplate": "Default_Network_Universal",
+                "networkExtensionTemplate": "Default_Network_Extension_Universal",
+                "source": null,
+                "serviceNetworkTemplate": null
+            }
+          status_code: 200
+          return_content: yes
+          validate_certs: no
+  
+    - set_stats:
+       data:
+         webextext: "Changed the fabric gateway ip to {{ gateway_ipv4_address }} for VLAN {{ vlan_id }}."
+       per_host: no
