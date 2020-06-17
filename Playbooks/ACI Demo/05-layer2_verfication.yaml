@@ -34,7 +34,7 @@
 #### fping subnet
       - name: Pre Test Subnet Connectivity
         shell:
-          cmd: "fping -ga {{ gateway }}/26"
+          cmd: "fping -ga {{ gateway }}/{{ gw_cidr }}"
         delegate_to: localhost
         register: preresult
         ignore_errors: yes
