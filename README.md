@@ -1,8 +1,20 @@
 # PUD202_2020
 
+## Description
+Repository for Partner University DevNet 2020 - Session "Migrating legacy networks into ACI/DCNM with Ansible/AWX".
+
+## Content
+This Repository contains Playbooks to allow the creation of migration workflows including some basic sanity checks.
+You can find the Ansible Playbooks under the respective folder.
+Copy of the Session Presentation can be found in the PDF folder.
+
+## Creators
+- Alexander Papenburg - Technical Solutions Architect
+- Stephan Grunske - Customer Success Specialist 
 
 
 
+# License
 Copyright (c) 2020 Cisco and/or its affiliates.
 
 This software is licensed to you under the terms of the Cisco Sample Code License, Version 1.1 (the "License"). You may obtain a copy of the License at
